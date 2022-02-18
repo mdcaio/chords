@@ -121,9 +121,23 @@ class _RawScale:
         self._avoid_base_note_and_flat()
         self._avoid_same_note_flat_and_sharp()
 
+    def _fix_root(self):
+        if self.root in NOTES_S and self.scale[0] in NOTES_B:
+            index_root = NOTES_B.index(self.scale[0])
+            self.scale = [
+                NOTES_S[index_root] if note == NOTES_B[index_root] else note
+                for note in self.scale
+            ]
+        if self.root in NOTES_B and self.scale[0] in NOTES_S:
+            index_root = NOTES_S.index(self.scale[0])
+            self.scale = [
+                NOTES_B[index_root] if note == NOTES_S[index_root] else note
+                for note in self.scale
+            ]
+
     def _avoid_same_note_flat_and_sharp(self):
         for sharp, flat, new_sharp, new_flat in zip(
-            [Ds, Gs, As], [Db, Gb, Ab], [Cs, Fs, Gs], [Db, Ab, Bb]
+            [Ds, Gs, As], [Db, Gb, Ab], [Cs, Fs, Gs], [Eb, Ab, Bb]
         ):
             if sharp in self.scale and flat in self.scale:
                 majority_sharp = self._vote_flat_or_sharp()
@@ -157,9 +171,10 @@ class _RawScale:
 
     def _shift_start(self):
         self.scale = self.scale[self.start_grade :]
+        self._fix_root()
 
     def __repr__(self) -> str:
-        return str(" ".join(self.scale[:7]))
+        return str("\t".join(self.scale[:7]))
 
 
 class Scale(_RawScale):
@@ -177,11 +192,20 @@ class Scale(_RawScale):
             else:
                 raise ValueError(
                     "base_scale should be 'major' or 'minor', "
-                    "or a list of semitone intervals."
+                    f"or a list of semitone intervals. Got {base_scale}."
                 )
         grade = int(mode) - 1 if mode not in MODAL_TONE else MODAL_TONE[mode]
-        root = chr(ord(root) - grade)
+        root = self._shift_root_for_raw_scale(root, base_scale, grade)
         super().__init__(root, base_scale, grade)
+
+    def _shift_root_for_raw_scale(self, root, base_scale, grade):
+        if root in NOTES_S:
+            root_idx = len(NOTES_S) - 1 - NOTES_S[::-1].index(root)
+            root = NOTES_S[root_idx - sum(base_scale[:grade])]
+        else:
+            root_idx = len(NOTES_B) - 1 - NOTES_B[::-1].index(root)
+            root = NOTES_B[root_idx - sum(base_scale[:grade])]
+        return root
 
 
 class _RawChords:
@@ -254,7 +278,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=C)
     parser.add_argument("--base_scale", default=MAJOR)
-    parser.add_argument("--mode", default=IONIAN)
+    parser.add_argument("--mode", default=3)
     args = parser.parse_args()
     scale = Scale(args.root, args.base_scale, args.mode)
     print(scale)
